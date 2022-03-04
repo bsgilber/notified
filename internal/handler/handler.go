@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/bsgilber/notified/internal/model"
@@ -37,6 +38,28 @@ func Subscribe(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 	case http.MethodPost:
+		var request model.CreateSubscriptionRequest
+
+		err := json.NewDecoder(req.Body).Decode(&request)
+		if err != nil {
+			panic(err)
+		}
+
+		if request.TopicName == "" || request.SubscriptionId == "" {
+			http.Error(w, fmt.Sprintf("Error: both 'topic_name' and 'subscription_id' are required fields in the RequestBody"), http.StatusBadRequest)
+		}
+
+		topic, err := model.GetTopic(request.TopicName).AddSubscriber(model.GetSubscriber(request.SubscriptionId))
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
+		}
+
+		out, err := json.Marshal(topic)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
+		}
+
+		w.Write(out)
 	case http.MethodOptions:
 		w.Header().Set("Allow", "POST, OPTIONS")
 		w.WriteHeader(http.StatusNoContent)
@@ -65,16 +88,28 @@ func Topic(w http.ResponseWriter, req *http.Request) {
 	switch req.Method {
 	case http.MethodGet:
 	case http.MethodPost:
-		decoder := json.NewDecoder(req.Body)
-
 		var request model.CreateTopicRequest
 
-		err := decoder.Decode(&request)
+		err := json.NewDecoder(req.Body).Decode(&request)
 		if err != nil {
 			panic(err)
 		}
 
-		model.Create(request.TopicName)
+		if request.TopicName == "" {
+			http.Error(w, fmt.Sprintf("Error: topicName is a required field in the RequestBody"), http.StatusBadRequest)
+		}
+
+		topic, err := model.CreateTopic(request.TopicName)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
+		}
+
+		out, err := json.Marshal(topic)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
+		}
+
+		w.Write(out)
 	case http.MethodOptions:
 		w.Header().Set("Allow", "GET, POST, OPTIONS")
 		w.WriteHeader(http.StatusNoContent)
@@ -94,7 +129,7 @@ func TopicList(w http.ResponseWriter, req *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 
-		w.Write(model.List())
+		w.Write(model.ListTopics())
 	case http.MethodPost:
 	case http.MethodOptions:
 		w.Header().Set("Allow", "POST, OPTIONS")
