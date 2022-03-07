@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 )
 
-var subscribers = map[string]*Subscriber{}
+var subscribers map[string]*Subscriber
 
 type Subscriber struct {
 	ID            string   `json:"id,omitempty" msgpack:"id,omitempty"`
@@ -17,11 +17,12 @@ type Subscriber struct {
 }
 
 type CreateSubscriptionRequest struct {
-	SubscriptionId string `json:"subscription_id,omitempty" msgpack:"subscription_id,omitempty"`
-	TopicName      string `json:"topic_name,omitempty" msgpack:"topic_name,omitempty"`
+	SubscriberId string `json:"subscription_id,omitempty" msgpack:"subscription_id,omitempty"`
+	TopicName    string `json:"topic_name,omitempty" msgpack:"topic_name,omitempty"`
 }
 
 func CreateSubscriber() *Subscriber {
+
 	id := uuid.New().String()
 
 	subscribers[id] = &Subscriber{
@@ -34,19 +35,24 @@ func CreateSubscriber() *Subscriber {
 	return subscribers[id]
 }
 
-func GetSubscriber(SubscriptionId string) *Subscriber {
-	return subscribers[SubscriptionId]
+func GetSubscriber(SubscriptionId string) (*Subscriber, error) {
+	subscriber, exists := subscribers[SubscriptionId]
+	if exists {
+		return subscriber, nil
+	}
+
+	return nil, fmt.Errorf("subscriber with id %s doesn't exist", SubscriptionId)
 }
 
 func DeleteSubscriber(SubscriptionId string) error {
 	subscriber, exists := subscribers[SubscriptionId]
 
-	if exists {
+	if !exists {
 		return fmt.Errorf("subscriber with id %s doesn't exist", SubscriptionId)
 	}
 
 	for _, j := range subscriber.Subscriptions {
-		j.RemoveSubscription(*subscriber)
+		j.RemoveSubscription(subscriber)
 	}
 
 	for i := range subscribers {
@@ -65,4 +71,14 @@ func FlushSubscribers() {
 
 func ListSubscribers() map[string]*Subscriber {
 	return subscribers
+}
+
+func LoadSubscriber(SubscriptionId string, subscriber *Subscriber) error {
+	subscriber, exists := subscribers[SubscriptionId]
+	if exists {
+		return fmt.Errorf("subscriber with id %s already exists", SubscriptionId)
+	}
+
+	subscribers[SubscriptionId] = subscriber
+	return nil
 }

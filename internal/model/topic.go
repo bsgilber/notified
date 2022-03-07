@@ -1,14 +1,13 @@
 package model
 
 import (
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 )
 
-var topics = map[string]*Topic{}
+var topics map[string]*Topic
 
 type Topic struct {
 	ID          string        `json:"id,omitempty" msgpack:"id,omitempty"`
@@ -44,8 +43,12 @@ func CreateTopic(topicName string) (*Topic, error) {
 	return topics[topicName], nil
 }
 
-func GetTopic(topicName string) *Topic {
-	return topics[topicName]
+func GetTopic(topicName string) (*Topic, error) {
+	if topic, exists := topics[topicName]; exists {
+		return topic, nil
+	}
+
+	return nil, fmt.Errorf("topic with name %s does not exist", topicName)
 }
 
 func DeleteTopic(topicName string) ([]byte, error) {
@@ -53,32 +56,23 @@ func DeleteTopic(topicName string) ([]byte, error) {
 		return []byte(topic.ID), nil
 	}
 
-	return []byte(""), fmt.Errorf("topic with name %s does not exist", topicName)
+	return nil, fmt.Errorf("topic with name %s does not exist", topicName)
 }
 
 func FlushTopics() {
 	topics = map[string]*Topic{}
 }
 
-func ListTopics() []byte {
-	if len(topics) == 0 {
-		return []byte("{}")
-	}
-
-	out, err := json.Marshal(topics)
-	if err != nil {
-		panic(err)
-	}
-
-	return out
+func ListTopics() map[string]*Topic {
+	return topics
 }
 
-func (t *Topic) AddSubscription(subscriber Subscriber) {
-	t.Subscribers = append(t.Subscribers, &subscriber)
-	subscriber.Subscriptions = append(subscriber.Subscriptions, *t)
+func (t *Topic) AddSubscription(subscriber *Subscriber) {
+	t.Subscribers = append(t.Subscribers, subscriber)
+	subscriber.Subscriptions = append(subscriber.Subscriptions, t)
 }
 
-func (t *Topic) RemoveSubscription(subscriber Subscriber) {
+func (t *Topic) RemoveSubscription(subscriber *Subscriber) {
 	for i := range t.Subscribers {
 		if t.Subscribers[i].ID == subscriber.ID {
 			t.Subscribers = append(t.Subscribers[:i], t.Subscribers[i+1:]...)

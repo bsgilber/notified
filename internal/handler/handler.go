@@ -33,8 +33,6 @@ func Health(w http.ResponseWriter, req *http.Request) {
 }
 
 func Subscribe(w http.ResponseWriter, req *http.Request) {
-	// Common code for all requests can go here...
-
 	switch req.Method {
 	case http.MethodGet:
 	case http.MethodPost:
@@ -45,21 +43,24 @@ func Subscribe(w http.ResponseWriter, req *http.Request) {
 			panic(err)
 		}
 
-		if request.TopicName == "" || request.SubscriptionId == "" {
+		if request.TopicName == "" || request.SubscriberId == "" {
 			http.Error(w, fmt.Sprintf("Error: both 'topic_name' and 'subscription_id' are required fields in the RequestBody"), http.StatusBadRequest)
 		}
 
-		topic, err := model.GetTopic(request.TopicName).AddSubscriber(model.GetSubscriber(request.SubscriptionId))
+		topic, err := model.GetTopic(request.TopicName)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
 		}
 
-		out, err := json.Marshal(topic)
+		subscriber, err := model.GetSubscriber(request.SubscriberId)
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
 		}
 
-		w.Write(out)
+		topic.AddSubscription(subscriber)
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(topic.ID))
 	case http.MethodOptions:
 		w.Header().Set("Allow", "POST, OPTIONS")
 		w.WriteHeader(http.StatusNoContent)
@@ -83,8 +84,6 @@ func Consume(w http.ResponseWriter, req *http.Request) {
 }
 
 func Topic(w http.ResponseWriter, req *http.Request) {
-	// Common code for all requests can go here...
-
 	switch req.Method {
 	case http.MethodGet:
 	case http.MethodPost:
@@ -101,7 +100,7 @@ func Topic(w http.ResponseWriter, req *http.Request) {
 
 		topic, err := model.CreateTopic(request.TopicName)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Error: %s", err), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintf("Error [create topic]: %s", err), http.StatusBadRequest)
 		}
 
 		out, err := json.Marshal(topic)
@@ -121,15 +120,19 @@ func Topic(w http.ResponseWriter, req *http.Request) {
 }
 
 func TopicList(w http.ResponseWriter, req *http.Request) {
-	// Common code for all requests can go here...
-
 	switch req.Method {
 	case http.MethodGet:
-		// set headers
+		topics := model.ListTopics()
+
+		out, err := json.Marshal(topics)
+		if err != nil {
+			panic(err)
+		}
+
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "application/json")
 
-		w.Write(model.ListTopics())
+		w.Write(out)
 	case http.MethodPost:
 	case http.MethodOptions:
 		w.Header().Set("Allow", "POST, OPTIONS")
